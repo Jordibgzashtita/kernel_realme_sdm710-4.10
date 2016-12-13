@@ -707,10 +707,382 @@ nv50_crtc_set_dither(struct nouveau_crtc *nv_crtc, bool update)
 	struct drm_connector *connector;
 	u32 *push, mode = 0x00;
 
-	nv_connector = nouveau_crtc_connector_get(nv_crtc);
-	connector = &nv_connector->base;
-	if (nv_connector->dithering_mode == DITHERING_MODE_AUTO) {
-		if (nv_crtc->base.primary->fb->depth > connector->display_info.bpc * 3)
+static void
+nv50_head_dither(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 2))) {
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA)
+			evo_mthd(push, 0x08a0 + (head->base.index * 0x0400), 1);
+		else
+		if (core->base.user.oclass < GK104_DISP_CORE_CHANNEL_DMA)
+			evo_mthd(push, 0x0490 + (head->base.index * 0x0300), 1);
+		else
+			evo_mthd(push, 0x04a0 + (head->base.index * 0x0300), 1);
+		evo_data(push, (asyh->dither.mode << 3) |
+			       (asyh->dither.bits << 1) |
+			        asyh->dither.enable);
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_ovly(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 bounds = 0;
+	u32 *push;
+
+	if (asyh->base.cpp) {
+		switch (asyh->base.cpp) {
+		case 8: bounds |= 0x00000500; break;
+		case 4: bounds |= 0x00000300; break;
+		case 2: bounds |= 0x00000100; break;
+		default:
+			WARN_ON(1);
+			break;
+		}
+		bounds |= 0x00000001;
+	}
+
+	if ((push = evo_wait(core, 2))) {
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA)
+			evo_mthd(push, 0x0904 + head->base.index * 0x400, 1);
+		else
+			evo_mthd(push, 0x04d4 + head->base.index * 0x300, 1);
+		evo_data(push, bounds);
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_base(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 bounds = 0;
+	u32 *push;
+
+	if (asyh->base.cpp) {
+		switch (asyh->base.cpp) {
+		case 8: bounds |= 0x00000500; break;
+		case 4: bounds |= 0x00000300; break;
+		case 2: bounds |= 0x00000100; break;
+		case 1: bounds |= 0x00000000; break;
+		default:
+			WARN_ON(1);
+			break;
+		}
+		bounds |= 0x00000001;
+	}
+
+	if ((push = evo_wait(core, 2))) {
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA)
+			evo_mthd(push, 0x0900 + head->base.index * 0x400, 1);
+		else
+			evo_mthd(push, 0x04d0 + head->base.index * 0x300, 1);
+		evo_data(push, bounds);
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_curs_clr(struct nv50_head *head)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 4))) {
+		if (core->base.user.oclass < G82_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0880 + head->base.index * 0x400, 1);
+			evo_data(push, 0x05000000);
+		} else
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0880 + head->base.index * 0x400, 1);
+			evo_data(push, 0x05000000);
+			evo_mthd(push, 0x089c + head->base.index * 0x400, 1);
+			evo_data(push, 0x00000000);
+		} else {
+			evo_mthd(push, 0x0480 + head->base.index * 0x300, 1);
+			evo_data(push, 0x05000000);
+			evo_mthd(push, 0x048c + head->base.index * 0x300, 1);
+			evo_data(push, 0x00000000);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_curs_set(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 5))) {
+		if (core->base.user.oclass < G82_DISP_BASE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0880 + head->base.index * 0x400, 2);
+			evo_data(push, 0x80000000 | (asyh->curs.layout << 26) |
+						    (asyh->curs.format << 24));
+			evo_data(push, asyh->curs.offset >> 8);
+		} else
+		if (core->base.user.oclass < GF110_DISP_BASE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0880 + head->base.index * 0x400, 2);
+			evo_data(push, 0x80000000 | (asyh->curs.layout << 26) |
+						    (asyh->curs.format << 24));
+			evo_data(push, asyh->curs.offset >> 8);
+			evo_mthd(push, 0x089c + head->base.index * 0x400, 1);
+			evo_data(push, asyh->curs.handle);
+		} else {
+			evo_mthd(push, 0x0480 + head->base.index * 0x300, 2);
+			evo_data(push, 0x80000000 | (asyh->curs.layout << 26) |
+						    (asyh->curs.format << 24));
+			evo_data(push, asyh->curs.offset >> 8);
+			evo_mthd(push, 0x048c + head->base.index * 0x300, 1);
+			evo_data(push, asyh->curs.handle);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_core_clr(struct nv50_head *head)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 2))) {
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA)
+			evo_mthd(push, 0x0874 + head->base.index * 0x400, 1);
+		else
+			evo_mthd(push, 0x0474 + head->base.index * 0x300, 1);
+		evo_data(push, 0x00000000);
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_core_set(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 9))) {
+		if (core->base.user.oclass < G82_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0860 + head->base.index * 0x400, 1);
+			evo_data(push, asyh->core.offset >> 8);
+			evo_mthd(push, 0x0868 + head->base.index * 0x400, 4);
+			evo_data(push, (asyh->core.h << 16) | asyh->core.w);
+			evo_data(push, asyh->core.layout << 20 |
+				       (asyh->core.pitch >> 8) << 8 |
+				       asyh->core.block);
+			evo_data(push, asyh->core.kind << 16 |
+				       asyh->core.format << 8);
+			evo_data(push, asyh->core.handle);
+			evo_mthd(push, 0x08c0 + head->base.index * 0x400, 1);
+			evo_data(push, (asyh->core.y << 16) | asyh->core.x);
+			/* EVO will complain with INVALID_STATE if we have an
+			 * active cursor and (re)specify HeadSetContextDmaIso
+			 * without also updating HeadSetOffsetCursor.
+			 */
+			asyh->set.curs = asyh->curs.visible;
+		} else
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0860 + head->base.index * 0x400, 1);
+			evo_data(push, asyh->core.offset >> 8);
+			evo_mthd(push, 0x0868 + head->base.index * 0x400, 4);
+			evo_data(push, (asyh->core.h << 16) | asyh->core.w);
+			evo_data(push, asyh->core.layout << 20 |
+				       (asyh->core.pitch >> 8) << 8 |
+				       asyh->core.block);
+			evo_data(push, asyh->core.format << 8);
+			evo_data(push, asyh->core.handle);
+			evo_mthd(push, 0x08c0 + head->base.index * 0x400, 1);
+			evo_data(push, (asyh->core.y << 16) | asyh->core.x);
+		} else {
+			evo_mthd(push, 0x0460 + head->base.index * 0x300, 1);
+			evo_data(push, asyh->core.offset >> 8);
+			evo_mthd(push, 0x0468 + head->base.index * 0x300, 4);
+			evo_data(push, (asyh->core.h << 16) | asyh->core.w);
+			evo_data(push, asyh->core.layout << 24 |
+				       (asyh->core.pitch >> 8) << 8 |
+				       asyh->core.block);
+			evo_data(push, asyh->core.format << 8);
+			evo_data(push, asyh->core.handle);
+			evo_mthd(push, 0x04b0 + head->base.index * 0x300, 1);
+			evo_data(push, (asyh->core.y << 16) | asyh->core.x);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_lut_clr(struct nv50_head *head)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 4))) {
+		if (core->base.user.oclass < G82_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0840 + (head->base.index * 0x400), 1);
+			evo_data(push, 0x40000000);
+		} else
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0840 + (head->base.index * 0x400), 1);
+			evo_data(push, 0x40000000);
+			evo_mthd(push, 0x085c + (head->base.index * 0x400), 1);
+			evo_data(push, 0x00000000);
+		} else {
+			evo_mthd(push, 0x0440 + (head->base.index * 0x300), 1);
+			evo_data(push, 0x03000000);
+			evo_mthd(push, 0x045c + (head->base.index * 0x300), 1);
+			evo_data(push, 0x00000000);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_lut_set(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 7))) {
+		if (core->base.user.oclass < G82_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0840 + (head->base.index * 0x400), 2);
+			evo_data(push, 0xc0000000);
+			evo_data(push, asyh->lut.offset >> 8);
+		} else
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0840 + (head->base.index * 0x400), 2);
+			evo_data(push, 0xc0000000);
+			evo_data(push, asyh->lut.offset >> 8);
+			evo_mthd(push, 0x085c + (head->base.index * 0x400), 1);
+			evo_data(push, asyh->lut.handle);
+		} else {
+			evo_mthd(push, 0x0440 + (head->base.index * 0x300), 4);
+			evo_data(push, 0x83000000);
+			evo_data(push, asyh->lut.offset >> 8);
+			evo_data(push, 0x00000000);
+			evo_data(push, 0x00000000);
+			evo_mthd(push, 0x045c + (head->base.index * 0x300), 1);
+			evo_data(push, asyh->lut.handle);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_mode(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	struct nv50_head_mode *m = &asyh->mode;
+	u32 *push;
+	if ((push = evo_wait(core, 14))) {
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x0804 + (head->base.index * 0x400), 2);
+			evo_data(push, 0x00800000 | m->clock);
+			evo_data(push, m->interlace ? 0x00000002 : 0x00000000);
+			evo_mthd(push, 0x0810 + (head->base.index * 0x400), 7);
+			evo_data(push, 0x00000000);
+			evo_data(push, (m->v.active  << 16) | m->h.active );
+			evo_data(push, (m->v.synce   << 16) | m->h.synce  );
+			evo_data(push, (m->v.blanke  << 16) | m->h.blanke );
+			evo_data(push, (m->v.blanks  << 16) | m->h.blanks );
+			evo_data(push, (m->v.blank2e << 16) | m->v.blank2s);
+			evo_data(push, asyh->mode.v.blankus);
+			evo_mthd(push, 0x082c + (head->base.index * 0x400), 1);
+			evo_data(push, 0x00000000);
+		} else {
+			evo_mthd(push, 0x0410 + (head->base.index * 0x300), 6);
+			evo_data(push, 0x00000000);
+			evo_data(push, (m->v.active  << 16) | m->h.active );
+			evo_data(push, (m->v.synce   << 16) | m->h.synce  );
+			evo_data(push, (m->v.blanke  << 16) | m->h.blanke );
+			evo_data(push, (m->v.blanks  << 16) | m->h.blanks );
+			evo_data(push, (m->v.blank2e << 16) | m->v.blank2s);
+			evo_mthd(push, 0x042c + (head->base.index * 0x300), 2);
+			evo_data(push, 0x00000000); /* ??? */
+			evo_data(push, 0xffffff00);
+			evo_mthd(push, 0x0450 + (head->base.index * 0x300), 3);
+			evo_data(push, m->clock * 1000);
+			evo_data(push, 0x00200000); /* ??? */
+			evo_data(push, m->clock * 1000);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_view(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	struct nv50_dmac *core = &nv50_disp(head->base.base.dev)->mast.base;
+	u32 *push;
+	if ((push = evo_wait(core, 10))) {
+		if (core->base.user.oclass < GF110_DISP_CORE_CHANNEL_DMA) {
+			evo_mthd(push, 0x08a4 + (head->base.index * 0x400), 1);
+			evo_data(push, 0x00000000);
+			evo_mthd(push, 0x08c8 + (head->base.index * 0x400), 1);
+			evo_data(push, (asyh->view.iH << 16) | asyh->view.iW);
+			evo_mthd(push, 0x08d8 + (head->base.index * 0x400), 2);
+			evo_data(push, (asyh->view.oH << 16) | asyh->view.oW);
+			evo_data(push, (asyh->view.oH << 16) | asyh->view.oW);
+		} else {
+			evo_mthd(push, 0x0494 + (head->base.index * 0x300), 1);
+			evo_data(push, 0x00000000);
+			evo_mthd(push, 0x04b8 + (head->base.index * 0x300), 1);
+			evo_data(push, (asyh->view.iH << 16) | asyh->view.iW);
+			evo_mthd(push, 0x04c0 + (head->base.index * 0x300), 3);
+			evo_data(push, (asyh->view.oH << 16) | asyh->view.oW);
+			evo_data(push, (asyh->view.oH << 16) | asyh->view.oW);
+			evo_data(push, (asyh->view.oH << 16) | asyh->view.oW);
+		}
+		evo_kick(push, core);
+	}
+}
+
+static void
+nv50_head_flush_clr(struct nv50_head *head, struct nv50_head_atom *asyh, bool y)
+{
+	if (asyh->clr.core && (!asyh->set.core || y))
+		nv50_head_lut_clr(head);
+	if (asyh->clr.core && (!asyh->set.core || y))
+		nv50_head_core_clr(head);
+	if (asyh->clr.curs && (!asyh->set.curs || y))
+		nv50_head_curs_clr(head);
+}
+
+static void
+nv50_head_flush_set(struct nv50_head *head, struct nv50_head_atom *asyh)
+{
+	if (asyh->set.view   ) nv50_head_view    (head, asyh);
+	if (asyh->set.mode   ) nv50_head_mode    (head, asyh);
+	if (asyh->set.core   ) nv50_head_lut_set (head, asyh);
+	if (asyh->set.core   ) nv50_head_core_set(head, asyh);
+	if (asyh->set.curs   ) nv50_head_curs_set(head, asyh);
+	if (asyh->set.base   ) nv50_head_base    (head, asyh);
+	if (asyh->set.ovly   ) nv50_head_ovly    (head, asyh);
+	if (asyh->set.dither ) nv50_head_dither  (head, asyh);
+	if (asyh->set.procamp) nv50_head_procamp (head, asyh);
+}
+
+static void
+nv50_head_atomic_check_procamp(struct nv50_head_atom *armh,
+			       struct nv50_head_atom *asyh,
+			       struct nouveau_conn_atom *asyc)
+{
+	const int vib = asyc->procamp.color_vibrance - 100;
+	const int hue = asyc->procamp.vibrant_hue - 90;
+	const int adj = (vib > 0) ? 50 : 0;
+	asyh->procamp.sat.cos = ((vib * 2047 + adj) / 100) & 0xfff;
+	asyh->procamp.sat.sin = ((hue * 2047) / 100) & 0xfff;
+	asyh->set.procamp = true;
+}
+
+static void
+nv50_head_atomic_check_dither(struct nv50_head_atom *armh,
+			      struct nv50_head_atom *asyh,
+			      struct nouveau_conn_atom *asyc)
+{
+	struct drm_connector *connector = asyc->state.connector;
+	u32 mode = 0x00;
+
+	if (asyc->dither.mode == DITHERING_MODE_AUTO) {
+		if (asyh->base.depth > connector->display_info.bpc * 3)
 			mode = DITHERING_MODE_DYNAMIC2X2;
 	} else {
 		mode = nv_connector->dithering_mode;
