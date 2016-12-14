@@ -10,10 +10,6 @@
 #include <linux/types.h>
 #include <linux/bug.h>
 #include <linux/restart_block.h>
-#include <linux/errno.h>
-
-struct timespec;
-struct compat_timespec;
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 /*

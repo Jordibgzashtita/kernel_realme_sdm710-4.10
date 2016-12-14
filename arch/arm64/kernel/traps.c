@@ -270,8 +270,7 @@ static unsigned int die_nest_count;
 
 static unsigned long oops_begin(void)
 {
-	int cpu;
-	unsigned long flags;
+	int ret;
 
 	oops_enter();
 
@@ -288,11 +287,8 @@ static unsigned long oops_begin(void)
 	die_owner = cpu;
 	console_verbose();
 	bust_spinlocks(1);
-	return flags;
-}
+	ret = __die(str, err, regs);
 
-static void oops_end(unsigned long flags, struct pt_regs *regs, int notify)
-{
 	if (regs && kexec_should_crash(current))
 		crash_kexec(regs);
 
@@ -481,7 +477,7 @@ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
 }
 
 #define __user_cache_maint(insn, address, res)			\
-	if (address >= user_addr_max()) {			\
+	if (untagged_addr(address) >= user_addr_max()) {	\
 		res = -EFAULT;					\
 	} else {						\
 		uaccess_ttbr0_enable();				\
