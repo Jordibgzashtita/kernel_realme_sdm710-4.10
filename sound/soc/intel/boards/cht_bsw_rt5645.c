@@ -48,7 +48,6 @@ struct cht_mc_private {
 	struct snd_soc_jack jack;
 	struct cht_acpi_card *acpi_card;
 	char codec_name[16];
-	struct clk *mclk;
 };
 
 static inline struct snd_soc_dai *cht_get_codec_dai(struct snd_soc_card *card)
@@ -294,11 +293,11 @@ static int cht_aif1_startup(struct snd_pcm_substream *substream)
 			SNDRV_PCM_HW_PARAM_RATE, 48000);
 }
 
-static struct snd_soc_ops cht_aif1_ops = {
+static const struct snd_soc_ops cht_aif1_ops = {
 	.startup = cht_aif1_startup,
 };
 
-static struct snd_soc_ops cht_be_ssp2_ops = {
+static const struct snd_soc_ops cht_be_ssp2_ops = {
 	.hw_params = cht_aif1_hw_params,
 };
 
@@ -439,6 +438,7 @@ static int snd_cht_mc_probe(struct platform_device *pdev)
 	}
 
 	card->dev = &pdev->dev;
+	mach = card->dev->platform_data;
 	sprintf(drv->codec_name, "i2c-%s:00", drv->acpi_card->codec_id);
 
 	/* set correct codec name */
