@@ -1111,12 +1111,14 @@ static int selinux_parse_opts_str(char *options,
 	}
 
 	rc = -ENOMEM;
-	opts->mnt_opts = kcalloc(NUM_SEL_MNT_OPTS, sizeof(char *), GFP_ATOMIC);
+	opts->mnt_opts = kcalloc(NUM_SEL_MNT_OPTS, sizeof(char *), GFP_KERNEL);
 	if (!opts->mnt_opts)
 		goto out_err;
 
-	opts->mnt_opts_flags = kcalloc(NUM_SEL_MNT_OPTS, sizeof(int), GFP_ATOMIC);
-	if (!opts->mnt_opts_flags)
+	opts->mnt_opts_flags = kcalloc(NUM_SEL_MNT_OPTS, sizeof(int),
+				       GFP_KERNEL);
+	if (!opts->mnt_opts_flags) {
+		kfree(opts->mnt_opts);
 		goto out_err;
 
 
@@ -1454,7 +1456,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 			 * inode_doinit with a dentry, before these inodes could
 			 * be used again by userspace.
 			 */
-			goto out_invalid;
+			goto out;
 		}
 
 		len = INITCONTEXTLEN;
@@ -1563,7 +1565,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 			 * could be used again by userspace.
 			 */
 			if (!dentry)
-				goto out_invalid;
+				goto out;
 			rc = selinux_genfs_get_sid(dentry, sclass,
 						   sbsec->flags, &sid);
 			dput(dentry);
@@ -1576,10 +1578,11 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 out:
 	spin_lock(&isec->lock);
 	if (isec->initialized == LABEL_PENDING) {
-		if (rc) {
+		if (!sid || rc) {
 			isec->initialized = LABEL_INVALID;
 			goto out_unlock;
 		}
+
 		isec->initialized = LABEL_INITIALIZED;
 		isec->sid = sid;
 	}
