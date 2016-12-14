@@ -40,52 +40,52 @@ struct ccp_tasklet_data {
 	struct ccp_cmd *cmd;
 };
 
- /* Human-readable error strings */
-#define CCP_MAX_ERROR_CODE	64
- static char *ccp_error_codes[] = {
- 	"",
-	"ILLEGAL_ENGINE",
-	"ILLEGAL_KEY_ID",
-	"ILLEGAL_FUNCTION_TYPE",
-	"ILLEGAL_FUNCTION_MODE",
-	"ILLEGAL_FUNCTION_ENCRYPT",
-	"ILLEGAL_FUNCTION_SIZE",
-	"Zlib_MISSING_INIT_EOM",
-	"ILLEGAL_FUNCTION_RSVD",
-	"ILLEGAL_BUFFER_LENGTH",
-	"VLSB_FAULT",
-	"ILLEGAL_MEM_ADDR",
-	"ILLEGAL_MEM_SEL",
-	"ILLEGAL_CONTEXT_ID",
-	"ILLEGAL_KEY_ADDR",
-	"0xF Reserved",
-	"Zlib_ILLEGAL_MULTI_QUEUE",
-	"Zlib_ILLEGAL_JOBID_CHANGE",
-	"CMD_TIMEOUT",
-	"IDMA0_AXI_SLVERR",
-	"IDMA0_AXI_DECERR",
-	"0x15 Reserved",
-	"IDMA1_AXI_SLAVE_FAULT",
-	"IDMA1_AIXI_DECERR",
-	"0x18 Reserved",
-	"ZLIBVHB_AXI_SLVERR",
-	"ZLIBVHB_AXI_DECERR",
-	"0x1B Reserved",
-	"ZLIB_UNEXPECTED_EOM",
-	"ZLIB_EXTRA_DATA",
-	"ZLIB_BTYPE",
-	"ZLIB_UNDEFINED_SYMBOL",
-	"ZLIB_UNDEFINED_DISTANCE_S",
-	"ZLIB_CODE_LENGTH_SYMBOL",
-	"ZLIB _VHB_ILLEGAL_FETCH",
-	"ZLIB_UNCOMPRESSED_LEN",
-	"ZLIB_LIMIT_REACHED",
-	"ZLIB_CHECKSUM_MISMATCH0",
-	"ODMA0_AXI_SLVERR",
-	"ODMA0_AXI_DECERR",
-	"0x28 Reserved",
-	"ODMA1_AXI_SLVERR",
-	"ODMA1_AXI_DECERR",
+/* Human-readable error strings */
+static char *ccp_error_codes[] = {
+	"",
+	"ERR 01: ILLEGAL_ENGINE",
+	"ERR 02: ILLEGAL_KEY_ID",
+	"ERR 03: ILLEGAL_FUNCTION_TYPE",
+	"ERR 04: ILLEGAL_FUNCTION_MODE",
+	"ERR 05: ILLEGAL_FUNCTION_ENCRYPT",
+	"ERR 06: ILLEGAL_FUNCTION_SIZE",
+	"ERR 07: Zlib_MISSING_INIT_EOM",
+	"ERR 08: ILLEGAL_FUNCTION_RSVD",
+	"ERR 09: ILLEGAL_BUFFER_LENGTH",
+	"ERR 10: VLSB_FAULT",
+	"ERR 11: ILLEGAL_MEM_ADDR",
+	"ERR 12: ILLEGAL_MEM_SEL",
+	"ERR 13: ILLEGAL_CONTEXT_ID",
+	"ERR 14: ILLEGAL_KEY_ADDR",
+	"ERR 15: 0xF Reserved",
+	"ERR 16: Zlib_ILLEGAL_MULTI_QUEUE",
+	"ERR 17: Zlib_ILLEGAL_JOBID_CHANGE",
+	"ERR 18: CMD_TIMEOUT",
+	"ERR 19: IDMA0_AXI_SLVERR",
+	"ERR 20: IDMA0_AXI_DECERR",
+	"ERR 21: 0x15 Reserved",
+	"ERR 22: IDMA1_AXI_SLAVE_FAULT",
+	"ERR 23: IDMA1_AIXI_DECERR",
+	"ERR 24: 0x18 Reserved",
+	"ERR 25: ZLIBVHB_AXI_SLVERR",
+	"ERR 26: ZLIBVHB_AXI_DECERR",
+	"ERR 27: 0x1B Reserved",
+	"ERR 27: ZLIB_UNEXPECTED_EOM",
+	"ERR 27: ZLIB_EXTRA_DATA",
+	"ERR 30: ZLIB_BTYPE",
+	"ERR 31: ZLIB_UNDEFINED_SYMBOL",
+	"ERR 32: ZLIB_UNDEFINED_DISTANCE_S",
+	"ERR 33: ZLIB_CODE_LENGTH_SYMBOL",
+	"ERR 34: ZLIB _VHB_ILLEGAL_FETCH",
+	"ERR 35: ZLIB_UNCOMPRESSED_LEN",
+	"ERR 36: ZLIB_LIMIT_REACHED",
+	"ERR 37: ZLIB_CHECKSUM_MISMATCH0",
+	"ERR 38: ODMA0_AXI_SLVERR",
+	"ERR 39: ODMA0_AXI_DECERR",
+	"ERR 40: 0x28 Reserved",
+	"ERR 41: ODMA1_AXI_SLVERR",
+	"ERR 42: ODMA1_AXI_DECERR",
+	"ERR 43: LSB_PARITY_ERR",
 };
 
 void ccp_log_error(struct ccp_device *d, unsigned int e)
@@ -486,6 +486,10 @@ struct ccp_device *ccp_alloc_struct(struct device *dev)
 	mutex_init(&ccp->sb_mutex);
 	ccp->sb_count = KSB_COUNT;
 	ccp->sb_start = 0;
+
+	/* Initialize the wait queues */
+	init_waitqueue_head(&ccp->sb_queue);
+	init_waitqueue_head(&ccp->suspend_queue);
 
 	ccp->ord = ccp_increment_unit_ordinal();
 	snprintf(ccp->name, MAX_CCP_NAME_LEN, "ccp-%u", ccp->ord);
