@@ -150,13 +150,8 @@ static void hmac_add_misc(struct shash_desc *desc, struct inode *inode,
 	} hmac_misc;
 
 	memset(&hmac_misc, 0, sizeof(hmac_misc));
-	/* Don't include the inode or generation number in portable
-	 * signatures
-	 */
-	if (type != EVM_XATTR_PORTABLE_DIGSIG) {
-		hmac_misc.ino = inode->i_ino;
-		hmac_misc.generation = inode->i_generation;
-	}
+	hmac_misc.ino = inode->i_ino;
+	hmac_misc.generation = inode->i_generation;
 	/* The hmac uid and gid must be encoded in the initial user
 	 * namespace (not the filesystems user namespace) as encoding
 	 * them in the filesystems user namespace allows an attack

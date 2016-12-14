@@ -762,13 +762,6 @@ static void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
 #endif
 }
 
-static void mm_init_uprobes_state(struct mm_struct *mm)
-{
-#ifdef CONFIG_UPROBES
-	mm->uprobes_state.xol_area = NULL;
-#endif
-}
-
 static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	struct user_namespace *user_ns)
 {
