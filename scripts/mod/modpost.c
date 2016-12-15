@@ -2413,6 +2413,7 @@ static void write_dump(const char *fname)
 		}
 	}
 	write_if_changed(&buf, fname);
+	free(buf.p);
 }
 
 struct ext_sym_list {
@@ -2539,6 +2540,7 @@ int main(int argc, char **argv)
 			      "Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.\n");
 		}
 	}
+	free(buf.p);
 
 	return err;
 }

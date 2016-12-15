@@ -80,7 +80,6 @@
 #include <linux/integrity.h>
 #include <linux/proc_ns.h>
 #include <linux/io.h>
-#include <linux/kaiser.h>
 #include <linux/cache.h>
 
 #include <asm/io.h>
