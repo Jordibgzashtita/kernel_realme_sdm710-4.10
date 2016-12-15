@@ -24,9 +24,6 @@
 #define NMI_WATCHDOG_ENABLED      (1 << NMI_WATCHDOG_ENABLED_BIT)
 #define SOFT_WATCHDOG_ENABLED     (1 << SOFT_WATCHDOG_ENABLED_BIT)
 
-DECLARE_PER_CPU(unsigned long, hrtimer_interrupts);
-DECLARE_PER_CPU(unsigned long, hrtimer_interrupts_saved);
-
 /**
  * touch_nmi_watchdog - restart NMI watchdog timeout.
  *
@@ -128,7 +125,6 @@ extern int watchdog_user_enabled;
 extern int watchdog_thresh;
 extern unsigned long watchdog_enabled;
 extern unsigned long *watchdog_cpumask_bits;
-extern atomic_t watchdog_park_in_progress;
 #ifdef CONFIG_SMP
 extern int sysctl_softlockup_all_cpu_backtrace;
 extern int sysctl_hardlockup_all_cpu_backtrace;
@@ -136,7 +132,6 @@ extern int sysctl_hardlockup_all_cpu_backtrace;
 #define sysctl_softlockup_all_cpu_backtrace 0
 #define sysctl_hardlockup_all_cpu_backtrace 0
 #endif
-
 extern bool is_hardlockup(void);
 struct ctl_table;
 extern int proc_watchdog(struct ctl_table *, int ,

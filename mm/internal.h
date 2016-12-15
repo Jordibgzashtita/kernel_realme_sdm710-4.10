@@ -36,9 +36,7 @@
 /* Do not use these with a slab allocator */
 #define GFP_SLAB_BUG_MASK (__GFP_DMA32|__GFP_HIGHMEM|~__GFP_BITS_MASK)
 
-void page_writeback_init(void);
-
-int do_swap_page(struct fault_env *fe, pte_t orig_pte);
+int do_swap_page(struct vm_fault *vmf);
 
 #ifdef CONFIG_SPECULATIVE_PAGE_FAULT
 extern struct vm_area_struct *get_vma(struct mm_struct *mm,

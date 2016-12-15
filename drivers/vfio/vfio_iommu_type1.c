@@ -245,7 +245,22 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
 	struct vm_area_struct *vma;
 	int ret = -EFAULT;
 
-	if (get_user_pages_fast(vaddr, 1, !!(prot & IOMMU_WRITE), page) == 1) {
+	if (mm == current->mm) {
+		ret = get_user_pages_fast(vaddr, 1, !!(prot & IOMMU_WRITE),
+					  page);
+	} else {
+		unsigned int flags = 0;
+
+		if (prot & IOMMU_WRITE)
+			flags |= FOLL_WRITE;
+
+		down_read(&mm->mmap_sem);
+		ret = get_user_pages_remote(NULL, mm, vaddr, 1, flags, page,
+					    NULL, NULL);
+		up_read(&mm->mmap_sem);
+	}
+
+	if (ret == 1) {
 		*pfn = page_to_pfn(page[0]);
 		return 0;
 	}
