@@ -1727,7 +1727,7 @@ static void blk_mq_init_cpu_queues(struct request_queue *q,
 static void blk_mq_map_swqueue(struct request_queue *q,
 			       const struct cpumask *online_mask)
 {
-	unsigned int i;
+	unsigned int i, hctx_idx;
 	struct blk_mq_hw_ctx *hctx;
 	struct blk_mq_ctx *ctx;
 	struct blk_mq_tag_set *set = q->tag_set;
@@ -1746,6 +1746,25 @@ static void blk_mq_map_swqueue(struct request_queue *q,
 	 * Map software to hardware queues
 	 */
 	for_each_possible_cpu(i) {
+		/* If the cpu isn't online, the cpu is mapped to first hctx */
+		if (!cpumask_test_cpu(i, online_mask))
+			continue;
+
+		hctx_idx = q->mq_map[i];
+		/* unmapped hw queue can be remapped after CPU topo changed */
+		if (!set->tags[hctx_idx]) {
+			set->tags[hctx_idx] = blk_mq_init_rq_map(set, hctx_idx);
+
+			/*
+			 * If tags initialization fail for some hctx,
+			 * that hctx won't be brought online.  In this
+			 * case, remap the current ctx to hctx[0] which
+			 * is guaranteed to always have tags allocated
+			 */
+			if (!set->tags[hctx_idx])
+				q->mq_map[i] = 0;
+		}
+
 		ctx = per_cpu_ptr(q->queue_ctx, i);
 		hctx = blk_mq_map_queue(q, i);
 
@@ -1763,7 +1782,11 @@ static void blk_mq_map_swqueue(struct request_queue *q,
 		 * disable it and free the request entries.
 		 */
 		if (!hctx->nr_ctx) {
-			if (set->tags[i]) {
+			/* Never unmap queue 0.  We need it as a
+			 * fallback in case of a new remap fails
+			 * allocation
+			 */
+			if (i && set->tags[i]) {
 				blk_mq_free_rq_map(set, set->tags[i], i);
 				set->tags[i] = NULL;
 			}
@@ -1771,9 +1794,6 @@ static void blk_mq_map_swqueue(struct request_queue *q,
 			continue;
 		}
 
-		/* unmapped hw queue can be remapped after CPU topo changed */
-		if (!set->tags[i])
-			set->tags[i] = blk_mq_init_rq_map(set, i);
 		hctx->tags = set->tags[i];
 		WARN_ON(!hctx->tags);
 
